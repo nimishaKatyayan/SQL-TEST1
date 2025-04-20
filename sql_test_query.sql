@@ -13,15 +13,34 @@ Expected Output: A table with columns: first_name, last_name, email, order_id, o
 --------------------------------------------------------------------------------------------------------
 QUERY:
 	
-SELECT first_name, last_name, email, order_id, order_date, sum(total_amount)
- FROM Customers C1 INNER JOIN Orders O1 
-  ON C1.customer_id = O1.customer_id
-  WHERE email LIKE '%@%' AND order_date IN (
-    SELECT    order_date
-    FROM    Orders
-    WHERE parseDateTimeBestEffortOrNull(toString(order_date)) IS NOT NULL) 
-    GROUP BY 1,2,3,4,5
-    ORDER BY 2,4 DESC
+SELECT
+    T1.first_name,
+    T1.last_name,
+    T1.email,
+    T2.order_id,
+    T2.order_date,
+    SUM(T2.total_amount) AS total_amount
+FROM (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY customer_id, email ORDER BY customer_id) AS rn
+    FROM Customers
+    WHERE email IS NOT NULL AND position(email, '@') > 1
+) AS T1
+INNER JOIN Orders T2 ON T1.customer_id = T2.customer_id
+WHERE
+    T1.rn = 1 -- remove duplicates
+    AND O1.order_date IS NOT NULL
+    AND parseDateTimeBestEffortOrNull(toString(O1.order_date)) IS NOT NULL
+GROUP BY
+    T1.first_name,
+    T1.last_name,
+    T1.email,
+    T2.order_id,
+    T2.order_date,
+ORDER BY
+    T1.last_name,
+    T2.order_date DESC;
+
 
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
